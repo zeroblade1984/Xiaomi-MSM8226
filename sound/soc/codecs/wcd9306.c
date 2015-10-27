@@ -39,6 +39,10 @@
 #include "wcd9xxx-resmgr.h"
 #include "wcd9xxx-common.h"
 
+#ifdef CONFIG_WCD9306_CODEC_CONTROL
+#include "tamod_control.h"
+#endif
+
 #define TAPAN_HPH_PA_SETTLE_COMP_ON 3000
 #define TAPAN_HPH_PA_SETTLE_COMP_OFF 13000
 
@@ -2003,9 +2007,23 @@ static int tapan_codec_enable_spk_pa(struct snd_soc_dapm_widget *w,
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
 		tapan->spkr_pa_widget_on = true;
+#ifdef CONFIG_WCD9306_CODEC_CONTROL
+		spkr_toggle = true;
+
 		snd_soc_update_bits(codec, TAPAN_A_SPKR_DRV_EN, 0x80, 0x80);
+
+		if (spkr_digigain_con) {
+			tapan_write(codec, TAPAN_A_CDC_RX3_VOL_CTL_B2_CTL, spkr_digigain);
+			tapan_write(codec, TAPAN_A_CDC_RX4_VOL_CTL_B2_CTL, spkr_digigain);
+		}
+#else
+		snd_soc_update_bits(codec, TAPAN_A_SPKR_DRV_EN, 0x80, 0x80);
+#endif
 		break;
 	case SND_SOC_DAPM_POST_PMD:
+#ifdef CONFIG_SND_SOC_WCD9320_CONTROL
+		spkr_toggle = false;
+#endif
 		tapan->spkr_pa_widget_on = false;
 		snd_soc_update_bits(codec, TAPAN_A_SPKR_DRV_EN, 0x80, 0x00);
 		break;
@@ -2703,6 +2721,14 @@ static int tapan_hph_pa_event(struct snd_soc_dapm_widget *w,
 						 req_clsh_state,
 						 WCD9XXX_CLSH_REQ_ENABLE,
 						 WCD9XXX_CLSH_EVENT_POST_PA);
+#ifdef CONFIG_WCD9306_CODEC_CONTROL
+		hp_toggle = true;
+
+		if (hp_digigain_con) {
+			tapan_write(codec, TAPAN_A_CDC_RX1_VOL_CTL_B2_CTL, hp_digigain);
+			tapan_write(codec, TAPAN_A_CDC_RX2_VOL_CTL_B2_CTL, hp_digigain);
+		}
+#endif
 
 		break;
 	case SND_SOC_DAPM_POST_PMD:
@@ -2718,6 +2744,9 @@ static int tapan_hph_pa_event(struct snd_soc_dapm_widget *w,
 						 req_clsh_state,
 						 WCD9XXX_CLSH_REQ_DISABLE,
 						 WCD9XXX_CLSH_EVENT_POST_PA);
+#ifdef CONFIG_WCD9306_CODEC_CONTROL
+		hp_toggle = false;
+#endif
 		break;
 	}
 	return 0;
@@ -3246,7 +3275,11 @@ static int tapan_volatile(struct snd_soc_codec *ssc, unsigned int reg)
 #define TAPAN_FORMATS (SNDRV_PCM_FMTBIT_S16_LE)
 #define TAPAN_FORMATS_S16_S24_LE (SNDRV_PCM_FMTBIT_S16_LE | \
 				  SNDRV_PCM_FORMAT_S24_LE)
-static int tapan_write(struct snd_soc_codec *codec, unsigned int reg,
+
+#ifndef CONFIG_WCD9306_CODEC_CONTROL
+static
+#endif
+int tapan_write(struct snd_soc_codec *codec, unsigned int reg,
 	unsigned int value)
 {
 	int ret;
@@ -3266,6 +3299,7 @@ static int tapan_write(struct snd_soc_codec *codec, unsigned int reg,
 
 	return wcd9xxx_reg_write(&wcd9xxx->core_res, reg, value);
 }
+
 static unsigned int tapan_read(struct snd_soc_codec *codec,
 				unsigned int reg)
 {
@@ -5956,6 +5990,9 @@ static int tapan_codec_probe(struct snd_soc_codec *codec)
 	}
 
 	tapan->codec = codec;
+#ifdef CONFIG_WCD9306_CODEC_CONTROL
+	wcd9306_codec = codec;
+#endif
 	for (i = 0; i < COMPANDER_MAX; i++) {
 		tapan->comp_enabled[i] = 0;
 		tapan->comp_fs[i] = COMPANDER_FS_48KHZ;
