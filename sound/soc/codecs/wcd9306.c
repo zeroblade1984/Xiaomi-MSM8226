@@ -1095,18 +1095,7 @@ static const struct snd_kcontrol_new class_h_dsm_mux =
 static int tapan_hph_impedance_get(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
-	uint32_t zl, zr;
-	bool hphr;
-	struct soc_multi_mixer_control *mc;
-	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-	struct tapan_priv *priv = snd_soc_codec_get_drvdata(codec);
-
-	mc = (struct soc_multi_mixer_control *)(kcontrol->private_value);
-
-	hphr = mc->shift;
-	wcd9xxx_mbhc_get_impedance(&priv->mbhc, &zl, &zr);
-	pr_debug("%s: zl %u, zr %u\n", __func__, zl, zr);
-	ucontrol->value.integer.value[0] = hphr ? zr : zl;
+	ucontrol->value.integer.value[0] = 0;
 
 	return 0;
 }
