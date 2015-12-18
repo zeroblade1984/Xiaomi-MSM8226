@@ -937,74 +937,17 @@ static void __ref do_core_control(long temp)
 	}
 	mutex_unlock(&core_control_mutex);
 }
-/* Call with core_control_mutex locked */
-static int __ref update_offline_cores(int val)
-{
-	uint32_t cpu = 0;
-	int ret = 0;
-
-	if (!core_control_enabled)
-		return 0;
-
-	cpus_offlined = msm_thermal_info.core_control_mask & val;
-
-	for_each_possible_cpu(cpu) {
-		if (!(cpus_offlined & BIT(cpu)))
-			continue;
-		if (!cpu_online(cpu))
-			continue;
-		ret = cpu_down(cpu);
-		if (ret)
-			pr_err("%s: Unable to offline cpu%d\n",
-				KBUILD_MODNAME, cpu);
-	}
-	return ret;
-}
-
-static __ref int do_hotplug(void *data)
-{
-	int ret = 0;
-	uint32_t cpu = 0, mask = 0;
-
-	if (!core_control_enabled)
-		return -EINVAL;
-
-	while (!kthread_should_stop()) {
-		wait_for_completion(&hotplug_notify_complete);
-		INIT_COMPLETION(hotplug_notify_complete);
-		mask = 0;
-
-		mutex_lock(&core_control_mutex);
-		for_each_possible_cpu(cpu) {
-			if (hotplug_enabled &&
-				cpus[cpu].hotplug_thresh_clear) {
-				set_threshold(cpus[cpu].sensor_id,
-				&cpus[cpu].threshold[HOTPLUG_THRESHOLD_HIGH]);
-
-				cpus[cpu].hotplug_thresh_clear = false;
-			}
-			if (cpus[cpu].offline || cpus[cpu].user_offline)
-				mask |= BIT(cpu);
-		}
-		if (mask != cpus_offlined)
-			update_offline_cores(mask);
-		mutex_unlock(&core_control_mutex);
-		sysfs_notify(cc_kobj, NULL, "cpus_offlined");
-	}
-
-	return ret;
-}
 #else
 static void do_core_control(long temp)
 {
 	return;
 }
+#endif
 
 static __ref int do_hotplug(void *data)
 {
 	return 0;
 }
-#endif
 
 static int do_ocr(void)
 {
